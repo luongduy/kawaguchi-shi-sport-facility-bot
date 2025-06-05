@@ -1,6 +1,7 @@
 import asyncio
 import requests
 import os
+import sys
 from playwright.async_api import async_playwright, Frame
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -129,7 +130,9 @@ async def check_for_second_taikukan(frame: Frame, name: str):
         return False
 
 
-async def run(slack_webhook_url: str = None, headless: bool = True):
+async def run(
+    slack_webhook_url: str = None, headless: bool = True, day_of_week: str = "sat"
+):
     async with async_playwright() as p:
         # Capture the execution time in JST
         execution_time = datetime.now(ZoneInfo("Asia/Tokyo")).strftime(
@@ -176,11 +179,16 @@ async def run(slack_webhook_url: str = None, headless: bool = True):
         ).last.click()
 
         result, next_target_day_str = await check_for_taikukan(
-            frame, "芝スポーツセンター", 1, "sat"
+            frame, "芝スポーツセンター", 1, day_of_week
         )
 
+        day_name = (
+            "Saturday"
+            if day_of_week == "sat"
+            else "Sunday" if day_of_week == "sun" else day_of_week.title()
+        )
         data = {
-            "芝スポーツセンター": result,
+            f"芝スポーツセンター ({day_name})": result,
         }
 
         # Step 6: Check for other sports facilities
@@ -201,7 +209,8 @@ async def run(slack_webhook_url: str = None, headless: bool = True):
             next_target_day_str = datetime.strptime(
                 next_target_day_str, "%Y%m%d"
             ).strftime("%Y-%m-%d")
-            msg = f"✅✅✅🏃‍♂️ Sports Facilities Available for {next_target_day_str}:\n"
+
+            msg = f"✅✅✅🏃‍♂️ Sports Facilities Available for {next_target_day_str} ({day_name}):\n"
             msg += f"🕒 Checked at: {execution_time}\n\n"
             for key, value in data.items():
                 if value:
@@ -216,7 +225,9 @@ async def run(slack_webhook_url: str = None, headless: bool = True):
                 await send_slack_message(slack_webhook_url, msg)
         else:
             msg = f"🕒 Checked at: {execution_time}\n"
-            msg += "❌ No available slots found for any sports facilities."
+            msg += (
+                f"❌ No available slots found for any sports facilities on {day_name}."
+            )
             print(msg)
 
             # Send to Slack if webhook URL is provided
@@ -237,10 +248,22 @@ if __name__ == "__main__":
     # Check if running in GitHub Actions or locally
     is_github_actions = os.getenv("GITHUB_ACTIONS") == "true"
 
+    # Get day of week from command line argument (default to "sat")
+    day_of_week = "sat"
+    if len(sys.argv) > 1:
+        day_arg = sys.argv[1].lower()
+        if day_arg in ["sat", "sun", "wed"] or day_arg.isdigit():
+            day_of_week = day_arg
+        else:
+            print("Invalid day argument. Use 'sat', 'sun', 'wed', or a number (0-6)")
+            sys.exit(1)
+
+    print(f"Checking sports facilities for: {day_of_week}")
+
     if is_github_actions:
         # Running in GitHub Actions - use headless mode
-        asyncio.run(run(slack_webhook_url, headless=True))
+        asyncio.run(run(slack_webhook_url, headless=True, day_of_week=day_of_week))
     else:
         # Running locally - you can choose headless mode or not
         # For local development, you might want to see the browser
-        asyncio.run(run(slack_webhook_url, headless=False))
+        asyncio.run(run(slack_webhook_url, headless=False, day_of_week=day_of_week))
