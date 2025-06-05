@@ -3,6 +3,7 @@ import requests
 import os
 from playwright.async_api import async_playwright, Frame
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import re
 
 
@@ -64,7 +65,7 @@ async def check_for_taikukan(frame: Frame, name: str, order: int, day_of_week: s
     await frame.wait_for_timeout(3000)
 
     # Go to next month if needed
-    today = datetime.today()
+    today = datetime.now(ZoneInfo("Asia/Tokyo")).date()
 
     # Get the next target day (skip today if today is target day)
     if today.weekday() == day_of_week:
@@ -130,8 +131,10 @@ async def check_for_second_taikukan(frame: Frame, name: str):
 
 async def run(slack_webhook_url: str = None, headless: bool = True):
     async with async_playwright() as p:
-        # Capture the execution time
-        execution_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Capture the execution time in JST
+        execution_time = datetime.now(ZoneInfo("Asia/Tokyo")).strftime(
+            "%Y-%m-%d %H:%M:%S JST"
+        )
 
         browser = await p.chromium.launch(headless=headless)
         page = await browser.new_page()
