@@ -3,7 +3,7 @@ name: Sports Facility Checker
 on:
   schedule:
     # Run every hour from 9AM to 11PM JST (0AM to 2PM UTC, JST is UTC+9)
-    - cron: '0 0-14 * * *'
+    - cron: '20 21-23,0-14 * * *'
   # Allow manual triggering
   workflow_dispatch:
 
